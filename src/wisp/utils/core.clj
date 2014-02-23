@@ -1,5 +1,6 @@
 (ns wisp.utils.core
   (:use [clojure.string :only [split upper-case]])
+  (:require [clojure.java.io :as io])
   (:import (java.nio.file Files Path FileSystems LinkOption)
            (java.nio.file.attribute PosixFilePermission)
            (java.nio.fs.UnixFileSystem)
@@ -88,3 +89,17 @@
                   name        (if (attrs "isDirectory") (str (.getName file) "/") (.getName file))]
               (printf "%s %d\t%s\t%s\t%d\t%s\t%s\n" permissions links owner group size modified name))
             (println (.getName file))))))))
+
+(defn head [filename]
+  (with-open [rdr (io/reader filename)]
+    (doseq [s (take 5 (line-seq rdr))]
+      (println s))))
+
+(defn tail [filename]
+  "I'm sure this is terribly inefficient... but I'm unsure how to make a bufferedReader read backwards."
+  (with-open [rdr (io/reader filename)]
+    (doseq [s (->> rdr (line-seq) (reverse) (take 5) (reverse))]
+      (println s))))
+
+(cat "./testout")
+(tail "./testout")
