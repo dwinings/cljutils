@@ -40,16 +40,15 @@
                       "GROUP_READ" 3 "GROUP_WRITE" 4 "GROUP_EXECUTE" 5
                       "OTHERS_READ" 6 "OTHERS_WRITE" 7 "OTHERS_EXECUTE" 8}
         str-indices (set (vals (select-keys perm-indices (seq perm-set))))]
-    (def ^:dynamic result)
-    (binding [result '()]
+    (let [result (ref '())]
       (doseq [idx (range 8 -1 -1)]
         (if (contains? str-indices idx)
-          (cond
-           (= (mod idx 3) 0) (set! result (cons \r result))
-           (= (mod idx 3) 1) (set! result (cons \w result))
-           (= (mod idx 3) 2) (set! result (cons \x result)))
-          (set! result (cons \- result))))
-      (apply str result))))
+          (dosync (cond
+                   (= (mod idx 3) 0) (ref-set result (cons \r @result))
+                   (= (mod idx 3) 1) (ref-set result (cons \w @result))
+                   (= (mod idx 3) 2) (ref-set result (cons \x @result))))
+          (dosync (ref-set result (cons \- @result)))))
+        (apply str @result))))
 
 
 (defn cat [filename]
@@ -62,7 +61,8 @@
         dir (File. dirname)
         flags (set flags)
         files (->> dir
-                   (file-seq)
+                   (.listFiles)
+                   (seq)
                    (sort-by #(.getName %1))
                    (call-if (flags :reverse) reverse))]
     (doseq [file files]
@@ -77,9 +77,6 @@
                   owner       (.getName (attrs "owner"))
                   group       (.getName (attrs "group"))
                   size        (attrs "size")
-                  name        (.getName file)]
-              (printf "%s\t%s\t%s\t%s\t%d\t%s\n" permissions modified owner group size name))
+                  name        (if (attrs "isDirectory") (str (.getName file) "/") (.getName file))]
+              (printf "%s  %s  %s\t%s\t%d\t%s\n" permissions modified owner group size name))
             (println (.getName file))))))))
-
-
-(ls "./" :long)
