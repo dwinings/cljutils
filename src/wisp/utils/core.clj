@@ -1,5 +1,5 @@
 (ns wisp.utils.core
-  (:use [clojure.string :only [split]])
+  (:use [clojure.string :only [split upper-case]])
   (:import (java.nio.file Files Path FileSystems LinkOption)
            (java.nio.file.attribute PosixFilePermission)
            (java.nio.fs.UnixFileSystem)
@@ -29,9 +29,16 @@
 (defn get-attrs [^java.io.File file]
   "Gets the posix file attributes and rolls them into a clojure map."
   (let [attrs (Files/readAttributes (make-path (.getAbsolutePath file))
-                                    "posix:*"
+                                    "unix:*"
                                     (into-array LinkOption [LinkOption/NOFOLLOW_LINKS]))]
     (reduce #(assoc %1 (.getKey %2) (.getValue %2)) {} attrs)))
+
+(defn -num-children [^java.io.File file]
+  (if-not (.isDirectory file) 1
+    (->> file
+         (file-seq)
+         (count)
+         (+ 1))))
 
 
 (defn posix-permissions-string [perm-set]
@@ -63,7 +70,7 @@
         files (->> dir
                    (.listFiles)
                    (seq)
-                   (sort-by #(.getName %1))
+                   (sort-by #(clojure.string/upper-case (.getName %1)))
                    (call-if (flags :reverse) reverse))]
     (doseq [file files]
       (let [filename (.getName file)]
@@ -73,10 +80,11 @@
             (let [attrs       (get-attrs file)
                   permissions (str (if (attrs "isDirectory") "d" "-")
                                    (posix-permissions-string (get-permissions (.getAbsolutePath file))))
+                  links       (attrs "nlink")
                   modified    (attrs "lastModifiedTime")
                   owner       (.getName (attrs "owner"))
                   group       (.getName (attrs "group"))
                   size        (attrs "size")
                   name        (if (attrs "isDirectory") (str (.getName file) "/") (.getName file))]
-              (printf "%s  %s  %s\t%s\t%d\t%s\n" permissions modified owner group size name))
+              (printf "%s %d\t%s\t%s\t%d\t%s\t%s\n" permissions links owner group size modified name))
             (println (.getName file))))))))
