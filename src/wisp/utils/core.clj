@@ -101,5 +101,13 @@
     (doseq [s (->> rdr (line-seq) (reverse) (take 5) (reverse))]
       (println s))))
 
-(cat "./testout")
-(tail "./testout")
+(defn wc [filename]
+  (let [lines (atom 0)
+        words (atom 0)
+        chrs  (atom 0)]
+    (with-open [rdr (io/reader filename)]
+      (doseq [line (line-seq rdr)]
+        (swap! lines inc)
+        (swap! words #(+ (count (split line #"\s+")) %1))
+        (swap! chrs #(+ 1 (count line) %1))) ;; Be sure to include the newlines.
+      (printf "%d\t%d\t%d\n" @lines @words @chrs))))
