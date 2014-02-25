@@ -101,13 +101,26 @@
     (doseq [s (->> rdr (line-seq) (reverse) (take 5) (reverse))]
       (println s))))
 
-(defn wc [filename]
-  (let [lines (atom 0)
-        words (atom 0)
-        chrs  (atom 0)]
-    (with-open [rdr (io/reader filename)]
-      (doseq [line (line-seq rdr)]
-        (swap! lines inc)
-        (swap! words #(+ (count (split line #"\s+")) %1))
-        (swap! chrs #(+ 1 (count line) %1))) ;; Be sure to include the newlines.
-      (printf "%d\t%d\t%d\n" @lines @words @chrs))))
+(defn wc
+  ([filename] (wc filename :chars :words :lines))
+  ([filename & flags]
+   (let [flags        (set flags)
+         lines        (atom 0)
+         words        (atom 0)
+         longest-line (atom 0)
+         chrs         ((get-attrs (File. filename)) "size")] ;; Why not cheat?
+     (with-open [rdr (io/reader filename)]
+       (doseq [line (line-seq rdr)]
+         (swap! lines inc)
+         (swap! longest-line #(max %1 (count line)))
+         (swap! words #(+ (count (split line #"\s+")) %1)))
+       (if (flags :lines)
+         (printf "%d\t" @lines))
+       (if (flags :words)
+         (printf "%d\t" @words))
+       (if (flags :chars)
+         (printf "%d\t" chrs))
+       (if (flags :longest-line)
+         (printf "%d\t" @longest-line))
+       (printf "%s\n" filename)))))
+
