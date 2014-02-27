@@ -64,6 +64,7 @@
 (defn cat [filename]
   (println (slurp filename)))
 
+(defrecord LSFile [permissions links owner group size modified-time name])
 (defn ls [dirname & flags]
   "Currently supported flags: :all :reverse :long"
   (let [path (make-path dirname)
@@ -72,28 +73,42 @@
         flags (set flags)
         files (->> dir
                    (.listFiles)
-                   (seq)
-                   (sort-by #(clojure.string/upper-case (.getName %1)))
-                   (call-if (flags :reverse) reverse))]
-    (doseq [file files]
-      (let [filename (.getName file)]
-        (if-not (and (= (.charAt filename 0) \.)
+                   (seq))]
+    (loop [files files result '()]
+      (if (empty? files) result
+          (let [file (first files)
+                filename (.getName file)]
+            (if (and (= (.charAt filename 0) \.)
                      (not (flags :all)))
-          (if (flags :long)
-            (let [attrs       (get-attrs file)
-                  permissions (str (if (attrs "isDirectory") "d" "-")
-                                   (posix-permissions-string 
-                                    (get-permissions (.getAbsolutePath file))))
-                  links       (attrs "nlink")
-                  modified    (attrs "lastModifiedTime")
-                  owner       (.getName (attrs "owner"))
-                  group       (.getName (attrs "group"))
-                  size        (attrs "size")
-                  name        (if (attrs "isDirectory") 
-                                (str (.getName file) "/") (.getName file))]
-              (printf "%s %d\t%s\t%s\t%d\t%s\t%s\n" 
-                      permissions links owner group size modified name))
-            (println (.getName file))))))))
+              (recur (rest files) result)
+              (let [attrs       (get-attrs file)
+                    permissions (str (if (attrs "isDirectory") "d" "-")
+                                     (posix-permissions-string 
+                                      (get-permissions (.getAbsolutePath file))))
+                    links       (attrs "nlink")
+                    modified    (attrs "lastModifiedTime")
+                    owner       (.getName (attrs "owner"))
+                    group       (.getName (attrs "group"))
+                    size        (attrs "size")
+                    name        (if (attrs "isDirectory") 
+                                  (str (.getName file) "/") (.getName file))]
+                (recur (rest files)
+                       (cons (LSFile. permissions links owner group size modified name) result)))))))))
+
+(defn -print-ls [lsfiles & flags]
+  (let [flags (set flags)
+        lsfiles (call-if (:reverse flags) reverse
+                         (sort-by #(upper-case (:name %)) lsfiles))]
+    (doseq [file lsfiles]
+      (if (:long flags)
+        (printf "%s %d\t%s\t%s\t%d\t%s\t%s\n"
+                (:permissions file)
+                (:links file)
+                (:owner file)
+                (:group file)
+                (:size file)
+                (:modified-time file)
+                (:name file))))))
 
 (defn head [filename]
   (with-open [rdr (io/reader filename)]
