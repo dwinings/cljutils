@@ -109,22 +109,28 @@
 (defn wc
   ([filename] (wc filename :chars :words :lines))
   ([filename & flags]
-   (let [flags        (set flags)
-         lines        (atom 0)
-         words        (atom 0)
-         longest-line (atom 0)
-         chrs         ((get-attrs (File. filename)) "size")] ;; Why not cheat?
      (with-open [rdr (io/reader filename)]
-       (doseq [line (line-seq rdr)]
-         (swap! lines inc)
-         (swap! longest-line #(max %1 (count line)))
-         (swap! words #(+ (count (split line #"\s+")) %1)))
-       (if (flags :lines)
-         (printf "%d\t" @lines))
-       (if (flags :words)
-         (printf "%d\t" @words))
-       (if (flags :chars)
-         (printf "%d\t" chrs))
-       (if (flags :longest-line)
-         (printf "%d\t" @longest-line))
-       (printf "%s\n" filename)))))
+       (let [flags (set flags)
+             counts (loop [lines (line-seq rdr)
+                           num-lines 0
+                           num-words 0
+                           longest-line 0]
+                      (if (empty? lines) 
+                        {:chars ((get-attrs (File. filename)) "size") ;; cheating...
+                         :lines num-lines 
+                         :words num-words 
+                         :longest longest-line}
+                        (recur (rest lines)
+                               (inc num-lines)
+                               (+ num-words (count (split (first lines) #"\s+")))
+                               (max longest-line (count (first lines))))))]
+         (do
+           (if (flags :lines)
+             (printf "%d\t" (:lines counts)))
+           (if (flags :words)
+             (printf "%d\t" (:words counts)))
+           (if (flags :chars)
+             (printf "%d\t" (:chars counts)))
+           (if (flags :longest)
+             (printf "%d\t" (:longest counts)))
+           (printf "%s\n" filename))))))
