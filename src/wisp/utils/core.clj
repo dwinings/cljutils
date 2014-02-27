@@ -97,40 +97,56 @@
 
 (defn head [filename]
   (with-open [rdr (io/reader filename)]
-    (doseq [s (take 5 (line-seq rdr))]
-      (println s))))
+    (->> rdr (line-seq) (take 5) (doall))))
 
 (defn tail [filename]
   "I'm sure this is terribly inefficient... but I'm unsure how to make a bufferedReader read backwards."
   (with-open [rdr (io/reader filename)]
-    (doseq [s (->> rdr (line-seq) (reverse) (take 5) (reverse))]
-      (println s))))
+    (->> rdr (line-seq) (reverse) (take 5) (reverse))))
 
 (defn wc
   ([filename] (wc filename :chars :words :lines))
   ([filename & flags]
      (with-open [rdr (io/reader filename)]
-       (let [flags (set flags)
-             counts (loop [lines (line-seq rdr)
-                           num-lines 0
-                           num-words 0
-                           longest-line 0]
-                      (if (empty? lines) 
-                        {:chars ((get-attrs (File. filename)) "size") ;; cheating...
-                         :lines num-lines 
-                         :words num-words 
-                         :longest longest-line}
-                        (recur (rest lines)
-                               (inc num-lines)
-                               (+ num-words (count (split (first lines) #"\s+")))
-                               (max longest-line (count (first lines))))))]
-         (do
-           (if (flags :lines)
-             (printf "%d\t" (:lines counts)))
-           (if (flags :words)
-             (printf "%d\t" (:words counts)))
-           (if (flags :chars)
-             (printf "%d\t" (:chars counts)))
-           (if (flags :longest)
-             (printf "%d\t" (:longest counts)))
-           (printf "%s\n" filename))))))
+       (let [flags (set flags)]
+           (loop [lines (line-seq rdr)
+                  num-lines 0
+                  num-words 0
+                  longest-line 0]
+             (if (empty? lines) 
+               {:chars ((get-attrs (File. filename)) "size") ;; cheating...
+                :lines num-lines 
+                :words num-words 
+                :longest longest-line
+                :name filename}
+               (recur (rest lines)
+                      (inc num-lines)
+                      (+ num-words (count (split (first lines) #"\s+")))
+                      (max longest-line (count (first lines))))))))))
+
+(defn -print-wc
+  ([counts] (-print-wc counts :lines :words :chars))
+  ([counts & flags]
+     (let [flags (set flags)]
+       (do
+         (if (flags :lines)
+           (printf "%d\t" (:lines counts)))
+         (if (flags :words)
+           (printf "%d\t" (:words counts)))
+         (if (flags :chars)
+           (printf "%d\t" (:chars counts)))
+         (if (flags :longest)
+           (printf "%d\t" (:longest counts)))
+         (printf "%s\n" (:name counts))))))
+
+;; This one was really easy!
+(defn grep [regex input & flags]
+  (with-open [rdr (io/reader input)]
+    (let [flags (set flags)
+          pattern (if (string? regex) (re-pattern regex) regex)]
+      (loop [lines (line-seq rdr) result '()]
+        (if (empty? lines) result
+            (recur (rest lines)
+                   (if (re-find pattern (first lines))
+                     (cons (first lines) result)
+                     result)))))))
