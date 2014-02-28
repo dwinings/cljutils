@@ -10,6 +10,12 @@
   "If condition is true, return f(x), else return x"
   `(if ~condition (~func ~x) ~x))
 
+(defmacro vararg [type & args]
+  "Doesn't do much, just glosses over the technical bits of java vararg."
+  (if (and (= 1 (count args)) (not (seq? (first args))))
+    `(into-array ~type (into [] (list ~args)))
+    `(into-array ~type (into [] ~@args))))
+
 (defn make-path [filename]
   "It turns out that clojure/java interop is a little odd with varargs"
   (let [split-name (split filename #"/")]
@@ -19,27 +25,29 @@
      (getPath (if (empty? (first split-name))
                 "/"
                 (first split-name))
-              (into-array String (rest split-name))))))
+              (vararg String (rest split-name))))))
 
 (defn get-permissions [filename]
   "Return a set of permissions for a given filename"
   (let [path (make-path filename)
-        pfm-obj (Files/getPosixFilePermissions path (into-array LinkOption [LinkOption/NOFOLLOW_LINKS]))]
+        pfm-obj (Files/getPosixFilePermissions
+                 path
+                 (vararg LinkOption LinkOption/NOFOLLOW_LINKS))]
     (set (map #(.name %1) pfm-obj))))
 
 (defn get-attrs [^java.io.File file]
   "Gets the posix file attributes and rolls them into a clojure map."
   (let [attrs (Files/readAttributes (make-path (.getAbsolutePath file))
                                     "unix:*"
-                                    (into-array LinkOption [LinkOption/NOFOLLOW_LINKS]))]
+                                    (vararg LinkOption LinkOption/NOFOLLOW_LINKS))]
     (reduce #(assoc %1 (.getKey %2) (.getValue %2)) {} attrs)))
 
 (defn -num-children [^java.io.File file]
   (if-not (.isDirectory file) 1
-    (->> file
-         (file-seq)
-         (count)
-         (+ 1))))
+          (->> file
+               (file-seq)
+               (count)
+               (+ 1))))
 
 
 (defn posix-permissions-string [perm-set]
@@ -68,7 +76,6 @@
 (defn ls [dirname & flags]
   "Currently supported flags: :all :reverse :long"
   (let [path (make-path dirname)
-        linkops (into-array LinkOption [LinkOption/NOFOLLOW_LINKS])
         dir (File. dirname)
         flags (set flags)
         files (->> dir
@@ -115,7 +122,8 @@
     (->> rdr (line-seq) (take 5) (doall))))
 
 (defn tail [filename]
-  "I'm sure this is terribly inefficient... but I'm unsure how to make a bufferedReader read backwards."
+  "I'm sure this is terribly inefficient... but I'm unsure how to make
+  a bufferedReader read backwards."
   (with-open [rdr (io/reader filename)]
     (->> rdr (line-seq) (reverse) (take 5) (reverse))))
 
@@ -124,20 +132,20 @@
   ([filename & flags]
      (with-open [rdr (io/reader filename)]
        (let [flags (set flags)]
-           (loop [lines (line-seq rdr)
-                  num-lines 0
-                  num-words 0
-                  longest-line 0]
-             (if (empty? lines) 
-               {:chars ((get-attrs (File. filename)) "size") ;; cheating...
-                :lines num-lines 
-                :words num-words 
-                :longest longest-line
-                :name filename}
-               (recur (rest lines)
-                      (inc num-lines)
-                      (+ num-words (count (split (first lines) #"\s+")))
-                      (max longest-line (count (first lines))))))))))
+         (loop [lines (line-seq rdr)
+                num-lines 0
+                num-words 0
+                longest-line 0]
+           (if (empty? lines) 
+             {:chars ((get-attrs (File. filename)) "size") ;; cheating...
+              :lines num-lines 
+              :words num-words 
+              :longest longest-line
+              :name filename}
+             (recur (rest lines)
+                    (inc num-lines)
+                    (+ num-words (count (split (first lines) #"\s+")))
+                    (max longest-line (count (first lines))))))))))
 
 (defn -print-wc
   ([counts] (-print-wc counts :lines :words :chars))
