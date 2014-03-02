@@ -12,9 +12,11 @@
 
 (defmacro vararg [type & args]
   "Doesn't do much, just glosses over the technical bits of java vararg."
-  (if (and (= 1 (count args)) (not (seq? (first args))))
-    `(into-array ~type (into [] (list ~args)))
-    `(into-array ~type (into [] ~@args))))
+  (if (and (= 1 (count args)) (vector? (first args)))
+    `(into-array ~type ~@args)
+    (if (and (= 1 (count args)) (seq? (first args)))
+      `(into-array ~type (into [] ~@args))
+      `(into-array ~type (into [] (list ~@args))))))
 
 (defn make-path [filename]
   "It turns out that clojure/java interop is a little odd with varargs"
@@ -173,3 +175,17 @@
                    (if (re-find pattern (first lines))
                      (cons (first lines) result)
                      result)))))))
+
+
+(defn tee [input file & flags]
+  "Prints input to both a file and stdout."
+  (let [flags (set flags)]
+    (with-open [wrtr (io/writer file
+                                (if (:append flags) {:append true} {:append false}))]
+      (cond
+       (seq? input) (doseq [elem input]
+                      (.write wrtr (str elem))
+                      (println (str elem)))
+       (string? input) (do
+                         (.write wrtr input)
+                         (println input))))))
