@@ -182,9 +182,10 @@
   (let [flags (set flags)]
     (with-open [wrtr (io/writer file :append (boolean (:append flags)))]
       (cond
-       (seq? input) (doseq [elem input]
-                      (.write wrtr (str elem "\n"))
-                      (println (str elem)))
-       (string? input)(do
-                        (.write wrtr (str input "\n"))
-                        (println input))))))
+       (or (vector? input)
+           (seq? input)) (doseq [elem input]
+                           (.write wrtr (str elem "\n"))
+                           (println (str elem)))
+       (string? input) (do
+                         (.write wrtr (str input "\n"))
+                         (println input))))))
