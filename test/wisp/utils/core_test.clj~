@@ -1,0 +1,10 @@
+(ns wisp.utils.core.test
+  (:use (clojure.test) (wisp.utils.core)))
+
+(deftest vararg-with-list
+  (is (= (vararg String '("hello"))
+         (into-array String ["hello"]))))
+
+(run-all-tests)
+(println (macroexpand-1 '(vararg String "hello")))
+(into-array String (into [] (list "hello")))
