@@ -180,12 +180,11 @@
 (defn tee [input file & flags]
   "Prints input to both a file and stdout."
   (let [flags (set flags)]
-    (with-open [wrtr (io/writer file
-                                (if (:append flags) {:append true} {:append false}))]
+    (with-open [wrtr (io/writer file :append (boolean (:append flags)))]
       (cond
        (seq? input) (doseq [elem input]
-                      (.write wrtr (str elem))
+                      (.write wrtr (str elem "\n"))
                       (println (str elem)))
-       (string? input) (do
-                         (.write wrtr input)
-                         (println input))))))
+       (string? input)(do
+                        (.write wrtr (str input "\n"))
+                        (println input))))))
