@@ -189,3 +189,22 @@
        (string? input) (do
                          (.write wrtr (str input "\n"))
                          (println input))))))
+
+(defn fold [filename & flags]
+  (let [flags (set flags)]
+    (with-open [rdr (io/reader filename)]
+      ;; This would most likely have been cleaner with doseq.
+      ;; Also, fold *has* to conflict with a function somewhere.
+      (loop [lines (line-seq rdr)]
+        (let [line (first lines)
+              line-length (.length line)
+              remaining (rest lines)]
+          (if (> line-length 80)
+            (do
+              (println (subs line 0 80))
+              (recur (cons (subs line 80 line-length) remaining)))
+            (do
+              (println line)
+              (if-not (empty? remaining)
+                (recur remaining)))))))))
+             
