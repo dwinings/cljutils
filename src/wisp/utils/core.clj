@@ -190,21 +190,45 @@
                          (.write wrtr (str input "\n"))
                          (println input))))))
 
+(defn segment-str [^java.lang.String str len]
+  "I tried this using a vector and no reverse call. There was no speedup."
+  (loop [pos 0
+         result '()]
+    (if (> (.length str) (+ pos len))
+      (recur
+       (+ pos len)
+       (cons (subs str pos (+ len pos)) result))
+      (reverse (cons (subs str pos (.length str)) result)))))
+
 (defn fold [filename & flags]
-  (let [flags (set flags)]
+  ;; I need to write a flagify function.
+  (let [flags (apply hash-map flags)]
     (with-open [rdr (io/reader filename)]
       ;; This would most likely have been cleaner with doseq.
       ;; Also, fold *has* to conflict with a function somewhere.
+      ;; Actually, this is faster than my doseq version.
+      ;; I should profile this.
       (loop [lines (line-seq rdr)]
         (let [line (first lines)
               line-length (.length line)
-              remaining (rest lines)]
-          (if (> line-length 80)
-            (do
-              (println (subs line 0 80))
-              (recur (cons (subs line 80 line-length) remaining)))
-            (do
-              (println line)
-              (if-not (empty? remaining)
-                (recur remaining)))))))))
+              remaining (rest lines)
+              width (if (flags :width) (flags :width) 80)]
+          (if (< line-length width)
+            (println line)
+            (dorun (map #'println (segment-str line width))))
+          (if-not (empty? remaining)
+            (recur remaining)))))))
+
+;; This was actually no faster.
+; (defn fold [filename & flags]
+;   (let [flags (set flags)]
+;     (with-open [rdr (io/reader filename)]
+;       (doseq [line (line-seq rdr)]
+;         (loop [line line]
+;           (if (> (.length line) 80)
+;             (do
+;               (println (subs line 0 80))
+;               (recur (subs line 80 (.length line))))
+;             (println line)))))))
+            
              
