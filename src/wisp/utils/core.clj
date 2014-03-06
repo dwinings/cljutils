@@ -190,7 +190,7 @@
                          (.write wrtr (str input "\n"))
                          (println input))))))
 
-(defn segment-str [^java.lang.String str len]
+(defn segment-str [^String str len]
   "I tried this using a vector and no reverse call. There was no speedup."
   (loop [pos 0
          result '()]
@@ -198,24 +198,39 @@
       (recur
        (+ pos len)
        (cons (subs str pos (+ len pos)) result))
-      (reverse (cons (subs str pos (.length str)) result)))))
+      ;; Dorun here is a major speedup.
+      ;; All of the lazy cons thunks were killing my performance.
+      (dorun (reverse (cons (subs str pos (.length str)) result))))))
 
+;; 2014-Mar-06 06:56:24 -0500 flexibility INFO [wisp.utils.core] - Profiling: :wisp.utils.core/fold
+;;                                           Id  Calls       Min        Max       MAD      Mean   Time% Time
+;;               :taoensso.timbre.profiling/map  16163     9.0μs    101.0μs     768ns    14.0μs      47 228.0ms
+;;       :taoensso.timbre.profiling/segment-str  16163     8.0μs     99.0μs     704ns    12.0μs      42 202.0ms
+;;             :taoensso.timbre.profiling/dorun  16163     3.0μs     68.0μs     190ns     3.0μs      10 48.0ms
+;;           :taoensso.timbre.profiling/reverse  16163     826ns     63.0μs      90ns     1.0μs       4 18.0ms
+;;         :taoensso.timbre.profiling/len-check  32519     221ns     42.0μs      37ns     291ns       2 9.0ms
+;;              :taoensso.timbre.profiling/cons  16356     298ns      3.0μs      50ns     505ns       2 8.0ms
+;;         :taoensso.timbre.profiling/next-line  17158     215ns     26.0μs      54ns     296ns       1 5.0ms
+;;       :taoensso.timbre.profiling/line-length  17158      91ns     10.0μs      30ns     130ns       0 2.0ms
+;; :taoensso.timbre.profiling/make-empty-result  16163      55ns      647ns       6ns      73ns       0 1.0ms
+;;                                 Clock Time                                                     100 486.0ms
+;;                             Accounted Time                                                     107 522.0ms
 (defn fold [filename & flags]
   ;; I need to write a flagify function.
-  (let [flags (apply hash-map flags)]
+  (let [flags (apply hash-map flags)
+        width (if (flags :width) (flags :width) 80)]
     (with-open [rdr (io/reader filename)]
       ;; This would most likely have been cleaner with doseq.
       ;; Also, fold *has* to conflict with a function somewhere.
       ;; Actually, this is faster than my doseq version.
-      ;; I should profile this.
+      ;; I profiled this.
       (loop [lines (line-seq rdr)]
-        (let [line (first lines)
+        (let [^String line (first lines)
               line-length (.length line)
-              remaining (rest lines)
-              width (if (flags :width) (flags :width) 80)]
+              remaining (rest lines)]
           (if (< line-length width)
             (println line)
-            (dorun (map #'println (segment-str line width))))
+            (map #'println (segment-str line width)))
           (if-not (empty? remaining)
             (recur remaining)))))))
 
