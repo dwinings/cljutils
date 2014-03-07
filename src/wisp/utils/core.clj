@@ -200,7 +200,7 @@
        (cons (subs str pos (+ len pos)) result))
       ;; Dorun here is a major speedup.
       ;; All of the lazy cons thunks were killing my performance.
-      (dorun (reverse (cons (subs str pos (.length str)) result))))))
+      (reverse (cons (subs str pos (.length str)) result)))))
 
 ;; 2014-Mar-06 06:56:24 -0500 flexibility INFO [wisp.utils.core] - Profiling: :wisp.utils.core/fold
 ;;                                           Id  Calls       Min        Max       MAD      Mean   Time% Time
@@ -218,7 +218,10 @@
 (defn fold [filename & flags]
   ;; I need to write a flagify function.
   (let [flags (apply hash-map flags)
-        width (if (flags :width) (flags :width) 80)]
+        width (if (flags :width) (flags :width) 80)
+        splitter-fn (if (:spaces flags)
+                      #(split %1 #"\s+")
+                      #(doall (segment-str %1 width)))]
     (with-open [rdr (io/reader filename)]
       ;; This would most likely have been cleaner with doseq.
       ;; Also, fold *has* to conflict with a function somewhere.
@@ -227,10 +230,10 @@
       (loop [lines (line-seq rdr)]
         (let [^String line (first lines)
               line-length (.length line)
-              remaining (rest lines)]
-          (if (< line-length width)
-            (println line)
-            (map #'println (segment-str line width)))
+              remaining (rest lines)
+              split-line (splitter-fn line)]
+          (doseq [section split-line]
+            (println section))
           (if-not (empty? remaining)
             (recur remaining)))))))
 
