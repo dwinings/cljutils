@@ -70,3 +70,15 @@
                (reduce #(str %1 %2 "\n") "" test-vec)))
         (swap! out-buf (fn [& rest] (StringWriter.)))))))
 
+(deftest fold-test
+  (let [test-str "abcdefghijklmnopqrstuv"
+        test-str-short "abcde"]
+    (do
+      (with-redefs  [io/reader (fn [& rest] (str-reader test-str))]
+        ; I use my own wc to test fold!
+        (is (= (:longest (wc
+                          (with-out-str (fold "w/e" :width 10))
+                          :string)) 10))
+        ))))
+        
+    
