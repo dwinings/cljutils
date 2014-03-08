@@ -4,11 +4,15 @@
   (:import (java.nio.file Files Path FileSystems LinkOption)
            (java.nio.file.attribute PosixFilePermission)
            (java.nio.fs.UnixFileSystem)
-           (java.io File)))
+           (java.io File StringReader BufferedReader)))
 
 (defmacro call-if [condition func x]
   "If condition is true, return f(x), else return x"
   `(if ~condition (~func ~x) ~x))
+
+(defn str-reader [s]
+  "Simple function that returns a bufferedReader of the given string."
+  (-> s (StringReader.) (BufferedReader.)))
 
 (defmacro vararg [type & args]
   "Doesn't do much, just glosses over the technical bits of java vararg."
@@ -132,22 +136,22 @@
 (defn wc
   ([filename] (wc filename :chars :words :lines))
   ([filename & flags]
-     (with-open [rdr (io/reader filename)]
        (let [flags (set flags)]
-         (loop [lines (line-seq rdr)
-                num-lines 0
-                num-words 0
-                longest-line 0]
-           (if (empty? lines) 
-             {:chars ((get-attrs (File. filename)) "size") ;; cheating...
-              :lines num-lines 
-              :words num-words 
-              :longest longest-line
-              :name filename}
-             (recur (rest lines)
-                    (inc num-lines)
-                    (+ num-words (count (split (first lines) #"\s+")))
-                    (max longest-line (count (first lines))))))))))
+         (with-open [rdr (if (:string flags) (str-reader filename) (io/reader filename))]
+           (loop [lines (line-seq rdr)
+                  num-lines 0
+                  num-words 0
+                  longest-line 0]
+             (if (empty? lines) 
+               {:chars (if (:string flags) (.length filename) ((get-attrs (File. filename)) "size")) ;; cheating...
+                :lines num-lines 
+                :words num-words 
+                :longest longest-line
+                :name (if (:string flags) "<String>" filename)}
+               (recur (rest lines)
+                      (inc num-lines)
+                      (+ num-words (count (split (first lines) #"\s+")))
+                      (max longest-line (count (first lines))))))))))
 
 (defn -print-wc
   ([counts] (-print-wc counts :lines :words :chars))
