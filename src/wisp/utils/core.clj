@@ -225,8 +225,9 @@
         width (if (flags :width) (flags :width) 80)
         splitter-fn (if (:spaces flags)
                       #(split %1 #"\s+")
-                      #(doall (segment-str %1 width)))]
-    (with-open [rdr (io/reader filename)]
+                      #(doall (segment-str %1 width)))
+        reader-fn #(if (:string flags) (str-reader %1) (io/reader %1))]
+    (with-open [rdr (reader-fn filename)]
       ;; This would most likely have been cleaner with doseq.
       ;; Also, fold *has* to conflict with a function somewhere.
       ;; Actually, this is faster than my doseq version.
