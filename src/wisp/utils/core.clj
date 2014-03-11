@@ -256,6 +256,7 @@
             
              
 (defn uniq [str & flags]
+  "Prints out the unique lines in the input."
   (let [flags (set flags)
         reader-fn #(if (:string flags) (str-reader %1) (io/reader %1))]
     (with-open [rdr (reader-fn str)]
