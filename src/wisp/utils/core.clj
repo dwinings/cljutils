@@ -1,5 +1,5 @@
 (ns wisp.utils.core
-  (:use [clojure.string :only [split upper-case]])
+  (:use [clojure.string :only [split upper-case lower-case]])
   (:require [clojure.java.io :as io])
   (:import (java.nio.file Files Path FileSystems LinkOption)
            (java.nio.file.attribute PosixFilePermission)
@@ -255,3 +255,19 @@
 ;             (println line)))))))
             
              
+(defn uniq [str & flags]
+  (let [flags (set flags)
+        reader-fn #(if (:string flags) (str-reader %1) (io/reader %1))]
+    (with-open [rdr (reader-fn str)]
+      (loop [lines (line-seq rdr)
+             accum (sorted-set-by #(compare
+                                    (lower-case (:str %1))
+                                    (lower-case (:str %2))))]
+        
+        (if-not (empty? lines)
+          (let [line (first lines)]
+            (if (contains? accum line)
+              (recur (rest lines) (conj accum {:str line :count (inc (accum line))}))
+              (recur (rest lines) (conj accum {:str line :count 0}))))
+          (map #(println (:str %1)) accum)
+          )))))
