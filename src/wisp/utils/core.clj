@@ -266,9 +266,10 @@
                                     (lower-case (:str %2))))]
         
         (if-not (empty? lines)
-          (let [line (first lines)]
+          (let [line {:str (first lines)}]
             (if (contains? accum line)
-              (recur (rest lines) (conj accum {:str line :count (inc (accum line))}))
-              (recur (rest lines) (conj accum {:str line :count 0}))))
-          (map #(println (:str %1)) accum)
+              (recur (rest lines) (conj accum {:str (:str line) :count (inc (:count (accum line)))}))
+              (recur (rest lines) (conj accum {:str (:str line) :count 0}))))
+          (doseq [s (seq accum)]
+            (println s))
           )))))
